@@ -1,0 +1,2 @@
+aws-cdk-lib==2.170.0   # replace with the latest stable version
+constructs>=10,<11     # compatible range for CDK v2
