@@ -1,14 +1,14 @@
-# cdk.py /path/to/file
+import os
+
 from aws_cdk import (
     App,
     Stack,
+    aws_ec2 as ec2,
+    aws_iam as iam,
+    aws_s3_assets as s3_assets,
 )
 from constructs import Construct
-import aws_cdk.aws_ec2 as ec2
-import aws_cdk.aws_elasticache as elasticache
-import aws_cdk.aws_iam as iam
-import aws_cdk.aws_kms as kms
-import aws_cdk.aws_ssm as ssm
+
 
 # ----------------------------------------------------------------------
 # VPN VPC Stack – holds all VPN resources
@@ -57,18 +57,63 @@ class VpnVpcStack(Stack):
             "Allow requests over 8000 from anywhere",
         )
 
+        # put service code in s3 for deployment
+        current_directory = os.getcwd()
+        repo_directory = os.path.abspath(os.path.join(current_directory, os.path.pardir))
+        code_path = repo_directory + "/app/vpn_service.py"
+
+        app_asset = s3_assets.Asset(self, "AppAsset",
+                                   path=code_path)
+
+        # create ec2 role
+        ec2_role = iam.Role(
+            self,
+            "WebServerInstanceRole",
+            assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+        )
+        # attach the S3 Policy
+        ec2_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "AmazonS3FullAccess"
+            )
+        )
+
+        # allow ec2 role to get asset
+        app_asset.grant_read(ec2_role)
+
+        user_data = ec2.UserData.for_linux()
+        user_data.add_commands(
+            "yum update -y",
+
+            # Create a dir for the app
+            "mkdir -p /opt/app",
+            f"cd /opt/app",
+
+            # Download the asset bundle from S3
+            f"aws s3 cp {app_asset.s3_object_url} vpn_service.py",
+
+            # Install dependencies
+            "python3 -m pip install --upgrade pip",
+            "pip3 install flask",
+
+            # Start the app
+            "python3 vpn_service.py"
+        )
+
         # Server for VPN service
         ec2.Instance(
             self,
-            "MyInstance",
+            "VPNServer",
             instance_type=ec2.InstanceType("t4g.micro"),
             machine_image=ec2.MachineImage.latest_amazon_linux(
+                cpu_type=ec2.AmazonLinuxCpuType.ARM_64,
                 generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2
             ),
             vpc=vpc,
             security_group=sg,
-            key_name="my-ssh-key",
             instance_name="VPNServer",
+            user_data=user_data,
+            role=ec2_role
         )
 
 # ----------------------------------------------------------------------
