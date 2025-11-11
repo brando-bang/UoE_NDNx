@@ -181,7 +181,7 @@ class UserDeviceVPCStack(Stack):
             f"aws s3 cp {app_asset.s3_object_url} user_device.py",
             # Install dependencies
             "python3 -m pip install --upgrade pip",
-            "pip3 install flask requests",
+            "pip3 install flask requests==2.29.0",
             # Start the app
             "python3 user_device.py",
         )
