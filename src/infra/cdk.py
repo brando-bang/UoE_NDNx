@@ -207,16 +207,16 @@ class UserDeviceVPCStack(Stack):
 # ----------------------------------------------------------------------
 app = App()
 
-east_coast_env = Environment(region="us-east-2")
-west_coast_env = Environment(region="us-west-2")
+vpn_env = Environment(region="ap-northeast-2")
+user_device_env = Environment(region="us-west-2")
 
 vpn_stack = VpnVpcStack(
-    app, "VpnVpcStack", env=east_coast_env
+    app, "VpnVpcStack", env=vpn_env
 )
 user_device_stack = UserDeviceVPCStack(
     app,
     "UserDeviceStack",
-    env=west_coast_env,
+    env=user_device_env,
 )
 
 app.synth()
