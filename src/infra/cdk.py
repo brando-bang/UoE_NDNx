@@ -6,10 +6,14 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3_assets as s3_assets
 from constructs import Construct
 
+CDN_URL = os.getenv("ndnx_qa_cdn_url")
+QA_KEY = os.getenv("ndnx_qa_key")
 
 # ----------------------------------------------------------------------
 # VPN Server Stack – holds all VPN resources
 # ----------------------------------------------------------------------
+
+
 class VpnServerStack(Stack):
     """
     This stack deploys the EC2 instance that serves as a VPN service for the prototype
@@ -76,6 +80,9 @@ class VpnServerStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
+            # Set env variables
+            f"export ndnx_qa_cdn_url={CDN_URL}",
+            f"export ndnx_qa_key={QA_KEY}",
             "yum update -y",
             # Create a dir for the app
             "mkdir -p /opt/app",
@@ -177,6 +184,9 @@ class UserDeviceVPCStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
+            # Set env variables
+            f"export ndnx_qa_cdn_url={CDN_URL}",
+            f"export ndnx_qa_key={QA_KEY}",
             "yum update -y",
             # Create a dir for the app
             "mkdir -p /opt/app",

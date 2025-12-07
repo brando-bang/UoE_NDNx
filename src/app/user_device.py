@@ -1,3 +1,4 @@
+import os
 import time
 
 import requests
@@ -6,7 +7,8 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-QA_KEY = "3p-Y39tgkAs6HJzIJto4gBUwLCEanFjK2qUzTfSsOxQ=".encode("utf-8")
+CDN_URL = os.getenv("ndnx_qa_cdn_url")
+QA_KEY = os.getenv("ndnx_qa_key").encode("utf-8")
 crypto_util = Fernet(QA_KEY)
 
 
@@ -18,7 +20,7 @@ def heartbeat():
 
 @app.route("/download_direct")
 def download_direct():
-    target_url = "https://raw.githubusercontent.com/twbs/bootstrap/refs/heads/main/dist/js/bootstrap.min.js"
+    target_url = "https://mirror.nforce.com/pub/speedtests/10mb.bin"
     start_time = time.time()
 
     get(target_url)
@@ -29,12 +31,9 @@ def download_direct():
 
 @app.route("/download_cdn")
 def download_cdn():
-    target_url = (
-        "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.min.js"
-    )
     start_time = time.time()
 
-    get(target_url)
+    get(CDN_URL)
     elapsed_time = time.time() - start_time
 
     return jsonify(str(elapsed_time * 1000) + " milliseconds")
@@ -68,7 +67,13 @@ def send_request():
 
 def get(target_url):
     try:
-        response = requests.get(target_url)
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+
+        response = requests.get(target_url, headers=headers)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
         return response.content

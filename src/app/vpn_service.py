@@ -1,10 +1,13 @@
+import os
+
 import requests
 from cryptography.fernet import Fernet
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-QA_KEY = "3p-Y39tgkAs6HJzIJto4gBUwLCEanFjK2qUzTfSsOxQ=".encode("utf-8")
+CDN_URL = os.getenv("ndnx_qa_cdn_url")
+QA_KEY = os.getenv("ndnx_qa_key").encode("utf-8")
 crypto_util = Fernet(QA_KEY)
 
 
@@ -16,18 +19,19 @@ def heartbeat():
 
 @app.route("/download_direct")
 def download_direct():
-    target_url = "https://raw.githubusercontent.com/twbs/bootstrap/refs/heads/main/dist/js/bootstrap.min.js"
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
 
+    target_url = "https://mirror.nforce.com/pub/speedtests/10mb.bin"
     return get(target_url)
 
 
 @app.route("/download_cdn")
 def download_cdn():
-    target_url = (
-        "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.min.js"
-    )
-
-    return get(target_url)
+    return get(CDN_URL)
 
 
 @app.route("/use_vpn")
@@ -54,7 +58,13 @@ def use_vpn():
 
 def get(target_url):
     try:
-        response = requests.get(target_url)
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+
+        response = requests.get(target_url, headers=headers)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
         return response.content
