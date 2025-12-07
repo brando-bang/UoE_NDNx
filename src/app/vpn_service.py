@@ -1,10 +1,11 @@
-import zipfile
-from io import BytesIO
-
 import requests
-from flask import Flask, jsonify
+from cryptography.fernet import Fernet
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
+QA_KEY = "3p-Y39tgkAs6HJzIJto4gBUwLCEanFjK2qUzTfSsOxQ=".encode("utf-8")
+crypto_util = Fernet(QA_KEY)
 
 
 @app.route("/heartbeat")
@@ -27,6 +28,28 @@ def download_cdn():
     )
 
     return get(target_url)
+
+
+@app.route("/use_vpn")
+def use_vpn():
+    encrypted_vpn_payload = request.args.get("vpn_payload")
+    encrypted_vpn_payload_bytes = encrypted_vpn_payload.encode("utf-8")
+    decrypted_vpn_payload_bytes = crypto_util.decrypt(encrypted_vpn_payload_bytes)
+    decrypted_vpn_payload = decrypted_vpn_payload_bytes.decode("utf-8")
+
+    data = None
+
+    if decrypted_vpn_payload == "direct":
+        data = download_direct()
+    elif decrypted_vpn_payload == "cdn":
+        data = download_cdn()
+    if not data:
+        return jsonify("no data found", 500)
+
+    encrypted_data = crypto_util.encrypt(data)
+    encrypted_vpn_response = encrypted_data.decode("utf-8")
+
+    return encrypted_vpn_response
 
 
 def get(target_url):
