@@ -42,11 +42,16 @@ def download_direct():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/download_direct_cdn")
+@app.route("/download_cdn")
 def download_cdn():
     target_url = "https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"
+    start_time = time.time()
 
-    return get(target_url)
+    get(target_url)
+    elapsed_time = time.time() - start_time
+
+    return jsonify(str(elapsed_time * 1000) + " milliseconds")
+
 
 @app.route("/send_request")
 def send_request():
