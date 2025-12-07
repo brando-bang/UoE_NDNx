@@ -66,7 +66,9 @@ class VpnVpcStack(Stack):
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
         ec2_role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "AmazonSSMManagedInstanceCore"
+            )
         )
 
         # allow ec2 role to get asset
@@ -82,7 +84,7 @@ class VpnVpcStack(Stack):
             f"aws s3 cp {app_asset.s3_object_url} vpn_service.py",
             # Install dependencies
             "python3 -m pip install --upgrade pip",
-            "pip3 install flask",
+            "pip3 install flask requests==2.29.0",
             # Start the app
             "python3 vpn_service.py",
         )
@@ -165,7 +167,9 @@ class UserDeviceVPCStack(Stack):
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
         ec2_role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "AmazonSSMManagedInstanceCore"
+            )
         )
 
         # allow ec2 role to get asset
@@ -210,9 +214,7 @@ app = App()
 vpn_env = Environment(region="ap-northeast-2")
 user_device_env = Environment(region="us-west-2")
 
-vpn_stack = VpnVpcStack(
-    app, "VpnVpcStack", env=vpn_env
-)
+vpn_stack = VpnVpcStack(app, "VpnStack", env=vpn_env)
 user_device_stack = UserDeviceVPCStack(
     app,
     "UserDeviceStack",
