@@ -9,6 +9,7 @@ from constructs import Construct
 ASSET_KEY = os.getenv("ndnx_asset_key")
 CONTENT_KEY = os.getenv("ndnx_content_key")
 CDN_URL = os.getenv("ndnx_qa_cdn_url")
+ENCRYPTED_CONTENT_KEY = os.getenv("ndnx_encrypted_content_key")
 NDNX_CONTENT_CACHE = os.getenv("ndnx_qa_content_cache")
 QA_KEY = os.getenv("ndnx_qa_key")
 
@@ -85,6 +86,8 @@ class VpnServiceStack(Stack):
         # User data script for deploying the code from S3 to the provisioned server
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
+            # Set env var for encrypted content key
+            f"export ndnx_encrypted_content_key={ENCRYPTED_CONTENT_KEY}",
             "yum update -y",
             # Create a dir for the app
             "mkdir -p /opt/app",

@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify, request
 
 # ----------------------------------------------------------------------
@@ -9,8 +11,13 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
+# This constant corresponds to the VPN-managed cache entry for the asset requested in the simulation. It is
+# passed to the server during deployment in cdk.py
+ENCRYPTED_CONTENT_KEY = os.getenv("ndnx_encrypted_content_key").encode("utf-8")
 
 # Heartbeat endpoint included on all services for testing deployment status
+
+
 @app.route("/heartbeat")
 def heartbeat():
     """Return a simple OK message for health checks."""
@@ -25,7 +32,7 @@ def check_content_key():
     content_key = request.args.get("content_key")
 
     if content_key == "10mb.bin":
-        return "gAAAAABpNfPVKq01kUouFVsT2PQGo83UWEuWevxB9TjVEz2D1v9Pz2y18QZtohsCpEhHP0GQ6sUYB1Bzcp4-_0akVGeMPLhd4g=="
+        return ENCRYPTED_CONTENT_KEY
 
     return jsonify("Key not found", 500)
 
