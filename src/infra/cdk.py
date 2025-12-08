@@ -13,19 +13,17 @@ NDNX_CONTENT_CACHE = os.getenv("ndnx_qa_content_cache")
 QA_KEY = os.getenv("ndnx_qa_key")
 
 # ----------------------------------------------------------------------
-# VPN Service Stack – holds all VPN resources
+# VPN Service Stack – Creates servers for the VPN service and NDNx Cache
+# and deploys both. It also creates various AWS infra required for them
+# to receive and handle traffic.
 # ----------------------------------------------------------------------
 
 
 class VpnServiceStack(Stack):
-    """
-    This stack deploys the EC2 instance that serves as a VPN service for the prototype
-    """
-
     def __init__(self, scope: Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # VPC for server
+        # VPC for the VPN Service
         vpc = ec2.Vpc(
             self,
             "VpnVpc",
@@ -39,7 +37,7 @@ class VpnServiceStack(Stack):
             ],
         )
 
-        # Security Group for server
+        # Security Group for NDNx Cache server
         self.ndnx_cache_sg = ec2.SecurityGroup(
             self,
             "NDNxCacheSG",
@@ -47,6 +45,7 @@ class VpnServiceStack(Stack):
             description="Security Group for VPN service",
             allow_all_outbound=True,
         )
+        # For ease in cross-region requests and since these servers are short lived, full ingress is allowed.
         self.ndnx_cache_sg.add_ingress_rule(
             ec2.Peer.any_ipv4(),
             ec2.Port.tcp(8000),
@@ -59,18 +58,18 @@ class VpnServiceStack(Stack):
             os.path.join(current_directory, os.path.pardir)
         )
         ndnx_cache_code_path = repo_directory + "/app/ndnx_content_key_cache.py"
-
         ndnx_cache_app_asset = s3_assets.Asset(
             self, "ndnx_cache_asset", path=ndnx_cache_code_path
         )
 
-        # create ec2 role
+        # create ec2 role for NDNx Cache
         ndnx_cache_ec2_role = iam.Role(
             self,
             "NDNxCacheRole",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
         )
-        # attach the S3 Policy
+
+        # attach policies for allowing usage of SSM profiles and access to the service code in S3
         ndnx_cache_ec2_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
@@ -83,6 +82,7 @@ class VpnServiceStack(Stack):
         # allow ec2 role to get asset
         ndnx_cache_app_asset.grant_read(ndnx_cache_ec2_role)
 
+        # User data script for deploying the code from S3 to the provisioned server
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             "yum update -y",
@@ -112,10 +112,10 @@ class VpnServiceStack(Stack):
             user_data=user_data,
             role=ndnx_cache_ec2_role,
         )
-
+        # Save the public IP of the cache server to set in VPN service env variables
         cache_domain = ndnx_cache_server.instance_public_ip
 
-        # Security Group for server
+        # Security Group for VPN server
         self.vpn_sg = ec2.SecurityGroup(
             self,
             "VPNServerSG",
@@ -123,6 +123,7 @@ class VpnServiceStack(Stack):
             description="Security Group for VPN service",
             allow_all_outbound=True,
         )
+        # For ease in cross-region requests and since these servers are short lived, full ingress is allowed.
         self.vpn_sg.add_ingress_rule(
             ec2.Peer.any_ipv4(),
             ec2.Port.tcp(8000),
@@ -136,13 +137,13 @@ class VpnServiceStack(Stack):
             self, "vpn_service_asset", path=vpn_service_code_path
         )
 
-        # create ec2 role
+        # create ec2 role for VPN Server
         vpn_service_ec2_role = iam.Role(
             self,
             "VPNServiceServerRole",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
         )
-        # attach the S3 Policy
+        # attach policies for allowing usage of SSM profiles and access to the service code in S3
         vpn_service_ec2_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
@@ -155,6 +156,7 @@ class VpnServiceStack(Stack):
         # allow ec2 role to get asset
         vpn_service_app_asset.grant_read(vpn_service_ec2_role)
 
+        # User data script for setting env vars and deploying the code from S3 to the provisioned server
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             # Set env variables
@@ -227,6 +229,7 @@ class UserDeviceVPCStack(Stack):
             description="Security Group for User Device",
             allow_all_outbound=True,
         )
+        # For ease in cross-region requests and since these servers are short lived, full ingress is allowed.
         self.user_device_sg.add_ingress_rule(
             ec2.Peer.any_ipv4(),
             ec2.Port.tcp(8000),
@@ -242,13 +245,13 @@ class UserDeviceVPCStack(Stack):
 
         app_asset = s3_assets.Asset(self, "user_device_asset", path=code_path)
 
-        # create ec2 role
+        # create ec2 role for User Device server
         ec2_role = iam.Role(
             self,
             "UserDeviceServerRole",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
         )
-        # attach the S3 Policy
+        # attach policies for allowing usage of SSM profiles and access to the service code in S3
         ec2_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
@@ -261,6 +264,7 @@ class UserDeviceVPCStack(Stack):
         # allow ec2 role to get asset
         app_asset.grant_read(ec2_role)
 
+        # User data script for setting env vars and deploying the code from S3 to the provisioned server
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             # Set env variables
@@ -282,7 +286,7 @@ class UserDeviceVPCStack(Stack):
             "python3 user_device.py",
         )
 
-        # Server for VPN service
+        # Server for User Device service
         ec2.Instance(
             self,
             "UserDevice",
@@ -303,6 +307,9 @@ class UserDeviceVPCStack(Stack):
 # ----------------------------------------------------------------------
 app = App()
 
+# To emphasize the effect of geo-distribution, the stacks are deployed in different regions
+# For the NDNx Research Project, this makes it easier to statistically prove the performance benefit
+# with lesser trials which was important for cost saving concerns.
 vpn_env = Environment(region="ap-northeast-2")
 user_device_env = Environment(region="us-west-2")
 
